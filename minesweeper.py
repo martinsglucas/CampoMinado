@@ -35,11 +35,16 @@ class CampoMinado():
     self.mapa = mapa
     self.bombas = bombas
   def escrever(self, conhecimento: str):
-    # with open("KB", '+a') as KB:
-    #   KB.write(conhecimento)
     os.system(f'echo "{conhecimento}" >> KB')
   def analisar(self):
     pass
+  def gerar_clausulas(self, array: list, r: int):
+    c = list(combinations(array, len(array)-r+1))
+    if c:
+      c.append([-num for num in array])
+    clausulas = [' '.join(str(num) for num in tupla)+ ' 0' for tupla in c]
+    return clausulas
+    
   def ler(self,):
     num_posicoes = int(input("numero de posicoes: "))
 
@@ -48,6 +53,7 @@ class CampoMinado():
       coluna = int(input("coluna: "))
       valor = int(input("valor: "))
 
+      # TODO: enfileirar/ empilhar essas posicoes para, depois, fazer perguntas sobre elas
       # TODO: verificar se isso está certo
       self.escrever(-self.mapa.get_var(linha,coluna))
 
@@ -55,20 +61,17 @@ class CampoMinado():
     
       # print("adjs: ", adjs)
       # print("nadjs: ", nadjs)
+
       # TODO: quando o len(nadjs)-valor+1 é igual a 1, tá criando a clausula errada
-      clausulas = list(combinations(nadjs, len(nadjs)-valor+1))
-      if clausulas:
-        clausulas.append([-num for num in nadjs])
+      clausulas = self.gerar_clausulas(nadjs, valor)
 
-      fclausulas = [' '.join(str(num) for num in tupla)+ ' 0' for tupla in clausulas]
-
-      for clausula in fclausulas:
+      for clausula in clausulas:
         self.escrever(clausula)
 
 
 if __name__ == '__main__':
 
-  os.system('echo "" > KB')
+  os.system('touch KB')
   tamanho = int(input("tamanho do mapa: "))
   bombas = int(input("quantidade de bombas: "))
   mapa = Mapa(tamanho)
