@@ -85,12 +85,10 @@ class CampoMinado:
             self.mapa.mapa[self.mapa.get_var(linha, coluna)] = [linha, coluna, valor]
 
             # TODO: enfileirar/ empilhar essas posicoes para, depois, fazer perguntas sobre elas
-            # TODO: verificar se isso está certo
-            self.escrever(-self.mapa.get_var(linha, coluna))
+            self.escrever(f"{-self.mapa.get_var(linha, coluna)} 0")
 
             if valor != 0:
                 adjs, nadjs = mapa.adj(linha, coluna)
-                # TODO: quando o len(nadjs)-valor+1 é igual a 1, tá criando a clausula errada
                 clausulas, tam_clausulas = self.gerar_clausulas(nadjs, valor)
                 self.clausulas += tam_clausulas + 1
 
