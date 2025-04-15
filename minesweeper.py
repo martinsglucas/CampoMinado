@@ -69,9 +69,10 @@ class CampoMinado:
         pass
 
     def gerar_clausulas(self, array: list, r: int):
-        c = list(combinations(array, len(array) - r + 1))
-        if c:
-            c.append([-num for num in array])
+        c1 = list(combinations(array, len(array) - r + 1))
+        n_array = list(map(lambda x: -x, array))
+        c2 = list(combinations(n_array, r+1))
+        c = c1 + c2
         clausulas = [" ".join(str(num) for num in tupla) + " 0" for tupla in c]
         return clausulas, len(clausulas)
 
