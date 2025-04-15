@@ -96,20 +96,24 @@ class CampoMinado:
                     self.escrever(clausula)
 
     def pergunta(self) -> int:
-        pos_adj = self.mapa.fila.pop(0)
-        os.system(f'echo "-{pos_adj}" > pergunta')
-        os.system("cat KB >> pergunta")
-        os.system("rm -f pergunta.cnf")  # Remove se já existir
-        os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
-        os.system("cat pergunta >> pergunta.cnf")
-        print(f"Decidindo {self.mapa.get_posicao(pos_adj)}...")
-        ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
-        exit_code = ret >> 8
+        while self.mapa.fila:
+            pos_adj = self.mapa.fila.pop(0)
+            os.system("cat KB > pergunta")
+            # os.system(f'echo "-{pos_adj} 0" >> pergunta') # pergunta se é bomba0
+            os.system(f'echo "{pos_adj} 0" >> pergunta') # pergunta se é seguro
+            os.system("rm -f pergunta.cnf")  # Remove se já existir
+            os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
+            os.system("cat pergunta >> pergunta.cnf")
+            print(f"Decidindo {self.mapa.get_posicao(pos_adj)[:2]}...")
+            ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
+            # ret = os.system("clasp pergunta.cnf")
+            exit_code = ret >> 8
 
-        if exit_code == 10:
-            print("SAT")
-        elif exit_code == 20:
-            print("UNSAT")
+            if exit_code == 10:
+                print("SAT")
+            elif exit_code == 20:
+                # print(f"UNSAT: bomba {self.mapa.get_posicao(pos_adj)[:2]}")
+                print(f"UNSAT: abre {self.mapa.get_posicao(pos_adj)[:2]}")
 
 
 if __name__ == "__main__":
