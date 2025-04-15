@@ -46,7 +46,7 @@ class Mapa:
             ):
                 adjs.append([nlinha, ncoluna])
                 nadjs.append(self.get_var(nlinha, ncoluna))
-                if self.mapa[self.get_var(nlinha, ncoluna)][2] != 0:
+                if self.mapa[self.get_var(nlinha, ncoluna)][2] != 0 and self.get_var(nlinha, ncoluna) not in self.fila:
                     self.fila.append(self.get_var(nlinha, ncoluna))
 
         for elem in self.fila:
