@@ -1,5 +1,6 @@
 from itertools import combinations
 import os
+import subprocess
 
 
 class Mapa:
@@ -61,6 +62,8 @@ class CampoMinado:
         self.mapa = mapa
         self.bombas = bombas
         self.clausulas = 0
+        self.bombas = []
+        self.seguros = []
 
     def escrever(self, conhecimento: str):
         os.system(f'echo "{conhecimento}" >> KB')
@@ -95,25 +98,56 @@ class CampoMinado:
                 for clausula in clausulas:
                     self.escrever(clausula)
 
+    def verifica_sat(self, var:int, neg: bool = False) -> int:
+        if neg:
+            var *= -1
+        os.system(f'echo "{var} 0" >> pergunta')
+        #os.system("rm -f pergunta.cnf")  # Remove se já existir
+        os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
+        os.system("cat pergunta >> pergunta.cnf")
+
+        ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
+        exit_code = ret >> 8
+        return exit_code
+
     def pergunta(self) -> int:
         while self.mapa.fila:
+            nova_fila = []
+        
             pos_adj = self.mapa.fila.pop(0)
             os.system("cat KB > pergunta")
-            # os.system(f'echo "-{pos_adj} 0" >> pergunta') # pergunta se é bomba0
+            os.system('rm -f pergunta.cnf')
+
+            """ 
+            os.system(f'echo "-{pos_adj} 0" >> pergunta') # pergunta se é bomba
             os.system(f'echo "{pos_adj} 0" >> pergunta') # pergunta se é seguro
             os.system("rm -f pergunta.cnf")  # Remove se já existir
             os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
             os.system("cat pergunta >> pergunta.cnf")
-            print(f"Decidindo {self.mapa.get_posicao(pos_adj)[:2]}...")
-            ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
-            # ret = os.system("clasp pergunta.cnf")
-            exit_code = ret >> 8
 
-            if exit_code == 10:
-                print("SAT")
-            elif exit_code == 20:
-                # print(f"UNSAT: bomba {self.mapa.get_posicao(pos_adj)[:2]}")
-                print(f"UNSAT: abre {self.mapa.get_posicao(pos_adj)[:2]}")
+            ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
+            exit_code = ret >> 8
+            """
+
+            print(f"\nDecidindo {self.mapa.get_posicao(pos_adj)[:2]}...\n")
+            tem_bomba = self.verifica_sat(pos_adj, neg=True)
+            if tem_bomba == 20:
+                print(f'{self.mapa.get_posicao(pos_adj)[:2]} é BOMBA')
+                self.bombas.append(pos_adj)
+                continue
+
+            # Remove a última linha de pergunta
+            os.system("sed -i '$d' pergunta")
+
+            e_seguro = self.verifica_sat(pos_adj)
+            if e_seguro == 20:
+                print(f'{self.mapa.get_posicao(pos_adj)[:2]} é SEGURO')
+                self.seguros.append(pos_adj)
+            else:
+                print(f"{self.mapa.get_posicao(pos_adj)[:2]} ainda NÂO SEI")
+                nova_fila.append(pos_adj)
+            
+        self.mapa.fila = nova_fila
 
 
 if __name__ == "__main__":
@@ -128,6 +162,6 @@ if __name__ == "__main__":
     campominado.ler()
     campominado.pergunta()
 
-    while len(campominado.mapa.fila) != 0:
+    while len(campominado.mapa.fila) >= 0:
         campominado.ler()
         campominado.pergunta()
