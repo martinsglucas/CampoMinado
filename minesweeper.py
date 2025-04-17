@@ -90,7 +90,7 @@ class CampoMinado:
         return clausulas, len(clausulas)
 
     def ler(self):
-        num_posicoes = int(input("numero de posicoes: "))
+        num_posicoes = int(input())
 
         for _ in range(num_posicoes):
             linha, coluna, valor = map(int, input().split())
@@ -112,7 +112,7 @@ class CampoMinado:
             var *= -1
         os.system('cat KB > pergunta')
         os.system(f'echo "{var} 0" >> pergunta')
-        #os.system("rm -f pergunta.cnf")  # Remove se já existir
+        # os.system("rm -f pergunta.cnf")  # Remove se já existir
         os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
         os.system("cat pergunta >> pergunta.cnf")
 
@@ -123,27 +123,16 @@ class CampoMinado:
     def pergunta(self) -> int:
         nova_fila = []
         while self.mapa.fila:
-        
+
             pos_adj = self.mapa.fila.pop(0)
             # os.system("cat KB > pergunta")
             os.system('rm -f pergunta.cnf')
 
-            """ 
-            os.system(f'echo "-{pos_adj} 0" >> pergunta') # pergunta se é bomba
-            os.system(f'echo "{pos_adj} 0" >> pergunta') # pergunta se é seguro
-            os.system("rm -f pergunta.cnf")  # Remove se já existir
-            os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
-            os.system("cat pergunta >> pergunta.cnf")
-
-            ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
-            exit_code = ret >> 8
-            """
-
-            print(f"\nDecidindo {self.mapa.get_posicao(pos_adj)[:2]}...\n")
+            # print(f"\nDecidindo {self.mapa.get_posicao(pos_adj)[:2]}...\n")
             tem_bomba = self.verifica_sat(pos_adj, neg=True)
             if tem_bomba == 20:
-                print(f'{self.mapa.get_posicao(pos_adj)[:2]} é BOMBA')
-                self.bombas.append(pos_adj)
+                # print(f'{self.mapa.get_posicao(pos_adj)[:2]} é BOMBA')
+                self.bombas.append(self.mapa.get_posicao(pos_adj)[:2])
                 # escrever na base de conhecimento e incrementar self.clausulas
                 os.system(f'echo "{pos_adj} 0" >> KB')
                 self.clausulas += 1
@@ -154,30 +143,49 @@ class CampoMinado:
 
             e_seguro = self.verifica_sat(pos_adj)
             if e_seguro == 20:
-                print(f'{self.mapa.get_posicao(pos_adj)[:2]} é SEGURO')
-                self.seguros.append(pos_adj)
+                # print(f'{self.mapa.get_posicao(pos_adj)[:2]} é SEGURO')
+                self.seguros.append(self.mapa.get_posicao(pos_adj)[:2])
                 # escrever na base de conhecimento e incrementar self.clausulas
                 os.system(f'echo "{-pos_adj} 0" >> KB')
                 self.clausulas += 1
             else:
-                print(f"{self.mapa.get_posicao(pos_adj)[:2]} ainda NÂO SEI")
+                # print(f"{self.mapa.get_posicao(pos_adj)[:2]} ainda NÂO SEI")
                 nova_fila.append(pos_adj)
-            
+
         self.mapa.fila = nova_fila
+
+    def resposta(self) -> int:
+        tot_len = len(self.bombas) + len(self.seguros)
+        print(tot_len)
+        for s in self.seguros:
+            l, c = s
+            print(f'{l} {c} A')
+        for b in self.bombas:
+            l, c = b
+            print(f'{l} {c} B')
+
+        self.seguros = []
+        self.bombas = []
+
+        return tot_len > 0
 
 
 if __name__ == "__main__":
 
+    os.system("cd /tmp/")
     os.system("rm -f KB")
-    tamanho = int(input("tamanho do mapa: "))
-    bombas = int(input("quantidade de bombas: "))
+    tamanho = int(input())
+    bombas = int(input())
     mapa = Mapa(tamanho)
     # print(mapa.mapa)
     campominado = CampoMinado(mapa, bombas)
 
     campominado.ler()
     campominado.pergunta()
+    res = campominado.resposta()
 
-    while len(campominado.mapa.fila) >= 0:
+
+    while len(campominado.mapa.fila) >= 0 or res:
         campominado.ler()
         campominado.pergunta()
+        res = campominado.resposta()
