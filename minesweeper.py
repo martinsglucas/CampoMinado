@@ -13,7 +13,15 @@ class Mapa:
         for linha in range(self.linhas):
             for coluna in range(self.colunas):
                 self.totvars += 1
-                self.mapa[self.totvars] = [linha, coluna, None]
+                # PENSANDO: 
+                # self.mapa[self.totvars] = 
+                # {
+                #   "linha": linha, 
+                #   "coluna": coluna, 
+                #   "valor": None, 
+                #   "visited": False
+                # }
+                self.mapa[self.totvars] = [linha, coluna, None, False]
                 self.mapa[linha, coluna] = self.totvars
 
     def get_posicao(self, var):
@@ -47,7 +55,9 @@ class Mapa:
             ):
                 adjs.append([nlinha, ncoluna])
                 nadjs.append(self.get_var(nlinha, ncoluna))
-                if self.mapa[self.get_var(nlinha, ncoluna)][2] != 0 and self.get_var(nlinha, ncoluna) not in self.fila:
+                if self.mapa[self.get_var(nlinha, ncoluna)][-1] != True and self.get_var(nlinha, ncoluna) not in self.fila:
+                    # print(self.mapa[self.get_var(nlinha, ncoluna)][-1])
+                    self.mapa[self.get_var(nlinha, ncoluna)][-1] = True
                     self.fila.append(self.get_var(nlinha, ncoluna))
 
         for elem in self.fila:
@@ -87,7 +97,6 @@ class CampoMinado:
 
             self.mapa.mapa[self.mapa.get_var(linha, coluna)] = [linha, coluna, valor]
 
-            # TODO: enfileirar/ empilhar essas posicoes para, depois, fazer perguntas sobre elas
             self.escrever(f"{-self.mapa.get_var(linha, coluna)} 0")
 
             if valor != 0:
@@ -101,6 +110,7 @@ class CampoMinado:
     def verifica_sat(self, var:int, neg: bool = False) -> int:
         if neg:
             var *= -1
+        os.system('cat KB > pergunta')
         os.system(f'echo "{var} 0" >> pergunta')
         #os.system("rm -f pergunta.cnf")  # Remove se já existir
         os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
@@ -111,11 +121,11 @@ class CampoMinado:
         return exit_code
 
     def pergunta(self) -> int:
+        nova_fila = []
         while self.mapa.fila:
-            nova_fila = []
         
             pos_adj = self.mapa.fila.pop(0)
-            os.system("cat KB > pergunta")
+            # os.system("cat KB > pergunta")
             os.system('rm -f pergunta.cnf')
 
             """ 
@@ -134,6 +144,9 @@ class CampoMinado:
             if tem_bomba == 20:
                 print(f'{self.mapa.get_posicao(pos_adj)[:2]} é BOMBA')
                 self.bombas.append(pos_adj)
+                # escrever na base de conhecimento e incrementar self.clausulas
+                os.system(f'echo "{pos_adj} 0" >> KB')
+                self.clausulas += 1
                 continue
 
             # Remove a última linha de pergunta
@@ -143,6 +156,9 @@ class CampoMinado:
             if e_seguro == 20:
                 print(f'{self.mapa.get_posicao(pos_adj)[:2]} é SEGURO')
                 self.seguros.append(pos_adj)
+                # escrever na base de conhecimento e incrementar self.clausulas
+                os.system(f'echo "{-pos_adj} 0" >> KB')
+                self.clausulas += 1
             else:
                 print(f"{self.mapa.get_posicao(pos_adj)[:2]} ainda NÂO SEI")
                 nova_fila.append(pos_adj)
