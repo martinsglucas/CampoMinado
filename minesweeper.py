@@ -1,5 +1,4 @@
 from itertools import combinations
-import os
 import subprocess
 
 
@@ -13,12 +12,12 @@ class Mapa:
         for linha in range(self.linhas):
             for coluna in range(self.colunas):
                 self.totvars += 1
-                # PENSANDO: 
-                # self.mapa[self.totvars] = 
+                # PENSANDO:
+                # self.mapa[self.totvars] =
                 # {
-                #   "linha": linha, 
-                #   "coluna": coluna, 
-                #   "valor": None, 
+                #   "linha": linha,
+                #   "coluna": coluna,
+                #   "valor": None,
                 #   "visited": False
                 # }
                 self.mapa[self.totvars] = [linha, coluna, None, False]
@@ -41,7 +40,7 @@ class Mapa:
             [-1, 1],
             [-1, 0],
         ]
-        adjs = []
+
         nadjs = []
 
         for direcao in direcoes:
@@ -53,9 +52,11 @@ class Mapa:
                 and ncoluna < self.colunas
                 and ncoluna >= 0
             ):
-                adjs.append([nlinha, ncoluna])
                 nadjs.append(self.get_var(nlinha, ncoluna))
-                if self.mapa[self.get_var(nlinha, ncoluna)][-1] != True and self.get_var(nlinha, ncoluna) not in self.fila:
+                if (
+                    self.mapa[self.get_var(nlinha, ncoluna)][-1] != True
+                    and self.get_var(nlinha, ncoluna) not in self.fila
+                ):
                     # print(self.mapa[self.get_var(nlinha, ncoluna)][-1])
                     self.mapa[self.get_var(nlinha, ncoluna)][-1] = True
                     self.fila.append(self.get_var(nlinha, ncoluna))
@@ -64,7 +65,7 @@ class Mapa:
             if self.mapa[elem][2] != None:
                 self.fila.remove(elem)
 
-        return adjs, nadjs
+        return nadjs
 
 
 class CampoMinado:
@@ -76,15 +77,14 @@ class CampoMinado:
         self.seguros = []
 
     def escrever(self, conhecimento: str):
-        os.system(f'echo "{conhecimento}" >> KB')
-
-    def analisar(self):
-        pass
+        # os.system(f'echo "{conhecimento}" >> KB')
+        with open("KB", "a") as kb:
+            kb.write(conhecimento + "\n")
 
     def gerar_clausulas(self, array: list, r: int):
         c1 = list(combinations(array, len(array) - r + 1))
         n_array = list(map(lambda x: -x, array))
-        c2 = list(combinations(n_array, r+1))
+        c2 = list(combinations(n_array, r + 1))
         c = c1 + c2
         clausulas = [" ".join(str(num) for num in tupla) + " 0" for tupla in c]
         return clausulas, len(clausulas)
@@ -100,25 +100,34 @@ class CampoMinado:
             self.escrever(f"{-self.mapa.get_var(linha, coluna)} 0")
 
             if valor != 0:
-                adjs, nadjs = mapa.adj(linha, coluna)
+                nadjs = mapa.adj(linha, coluna)
                 clausulas, tam_clausulas = self.gerar_clausulas(nadjs, valor)
                 self.clausulas += tam_clausulas + 1
 
                 for clausula in clausulas:
                     self.escrever(clausula)
 
-    def verifica_sat(self, var:int, neg: bool = False) -> int:
+    def verifica_sat(self, var: int, neg: bool = False) -> int:
         if neg:
             var *= -1
-        os.system('cat KB > pergunta')
-        os.system(f'echo "{var} 0" >> pergunta')
-        # os.system("rm -f pergunta.cnf")  # Remove se já existir
-        os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
-        os.system("cat pergunta >> pergunta.cnf")
+        # os.system('cat KB > pergunta')
+        with open("pergunta.cnf", "w") as p:
+            with open("KB", "r") as kb:
+                p.write(f"p cnf {self.mapa.totvars} {self.clausulas+1}\n")
+                p.write(kb.read())
+                p.write(f"{var} 0\n")
 
-        ret = os.system("clasp pergunta.cnf > /dev/null 2>&1")
-        exit_code = ret >> 8
-        return exit_code
+        # os.system(f'echo "{var} 0" >> pergunta')
+        # os.system("rm -f pergunta.cnf")  # Remove se já existir
+        # os.system(f'echo "p cnf {self.mapa.totvars} {self.clausulas+1}" > pergunta.cnf')
+        # os.system("cat pergunta >> pergunta.cnf")
+
+        ret = subprocess.run(
+            ["clasp", "pergunta.cnf"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        return ret
 
     def pergunta(self) -> int:
         nova_fila = []
@@ -126,7 +135,6 @@ class CampoMinado:
 
             pos_adj = self.mapa.fila.pop(0)
             # os.system("cat KB > pergunta")
-            os.system('rm -f pergunta.cnf')
 
             # print(f"\nDecidindo {self.mapa.get_posicao(pos_adj)[:2]}...\n")
             tem_bomba = self.verifica_sat(pos_adj, neg=True)
@@ -134,19 +142,21 @@ class CampoMinado:
                 # print(f'{self.mapa.get_posicao(pos_adj)[:2]} é BOMBA')
                 self.bombas.append(self.mapa.get_posicao(pos_adj)[:2])
                 # escrever na base de conhecimento e incrementar self.clausulas
-                os.system(f'echo "{pos_adj} 0" >> KB')
+                # os.system(f'echo "{pos_adj} 0" >> KB)
+                self.escrever(f"{pos_adj} 0")
                 self.clausulas += 1
                 continue
 
             # Remove a última linha de pergunta
-            os.system("sed -i '$d' pergunta")
+            # os.system("sed -i '$d' pergunta")
+            # with open("pergunta.cnf")
 
             e_seguro = self.verifica_sat(pos_adj)
             if e_seguro == 20:
                 # print(f'{self.mapa.get_posicao(pos_adj)[:2]} é SEGURO')
                 self.seguros.append(self.mapa.get_posicao(pos_adj)[:2])
                 # escrever na base de conhecimento e incrementar self.clausulas
-                os.system(f'echo "{-pos_adj} 0" >> KB')
+                self.escrever(f"{-pos_adj} 0")
                 self.clausulas += 1
             else:
                 # print(f"{self.mapa.get_posicao(pos_adj)[:2]} ainda NÂO SEI")
@@ -159,10 +169,10 @@ class CampoMinado:
         print(tot_len)
         for s in self.seguros:
             l, c = s
-            print(f'{l} {c} A')
+            print(f"{l} {c} A")
         for b in self.bombas:
             l, c = b
-            print(f'{l} {c} B')
+            print(f"{l} {c} B")
 
         self.seguros = []
         self.bombas = []
@@ -172,8 +182,10 @@ class CampoMinado:
 
 if __name__ == "__main__":
 
-    os.system("cd /tmp/")
-    os.system("rm -f KB")
+    # os.chdir("/tmp")
+    # os.system("rm -f KB")
+    with open("KB", "w") as kb:
+        pass
     tamanho = int(input())
     bombas = int(input())
     mapa = Mapa(tamanho)
@@ -184,8 +196,9 @@ if __name__ == "__main__":
     campominado.pergunta()
     res = campominado.resposta()
 
-
-    while len(campominado.mapa.fila) >= 0 or res:
+    while len(campominado.mapa.fila) >= 0:
         campominado.ler()
         campominado.pergunta()
         res = campominado.resposta()
+
+    print(0)
