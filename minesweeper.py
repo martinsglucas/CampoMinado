@@ -48,7 +48,7 @@ class Mapa:
                 and ncoluna >= 0
             ):
                 var = self.get_var(nlinha, ncoluna)
-                adjs.append(var)
+                adjs.append(f'{var}')
                 if not self.mapa[var][-1]:
                     self.mapa[var][-1] = True
                     self.fila.append(var)
@@ -56,7 +56,6 @@ class Mapa:
         for elem in list(self.fila):
             if self.mapa[elem][2] is not None:
                 self.fila.remove(elem)
-
         return adjs
 
 
@@ -67,62 +66,25 @@ class CampoMinado:
         self.clausulas = 0
         self.bombas = []
         self.seguros = []
+        self.KB: list[str] = []
 
     def escrever(self, conhecimento: str):
-        with open("KB", "a") as kb:
-            kb.write(conhecimento + "\n")
-
-    # def _combinacoes_str(self, array: list[int], r: int) -> list[str]:
-
-    #     resultados: list[str] = []
-
-    #     def helper(prefix: list[str], restos: list[int], k: int):
-    #         if k == 0:
-    #             resultados.append(" ".join(prefix) + " 0")
-    #             return
-    #         if len(restos) < k:
-    #             return
-    #         helper(prefix + [str(restos[0])], restos[1:], k - 1)
-    #         helper(prefix, restos[1:], k)
-
-    #     helper([], array, r)
-    #     return resultados
-
-    # def gerar_clausulas(self, array: list[int], r: int):
-    #     n = len(array)
-    #     L = self._combinacoes_str(array, n - r + 1)
-    #     negados = [-x for x in array]
-    #     U = self._combinacoes_str(negados, r + 1)
-
-    #     clausulas = L + U
-    #     return clausulas, len(clausulas)
-
-    """ def _combinacoes(self, array: list, r: int) -> list:
-        if r == 0:
-            return [[]]
-        if len(array) < r:
-            return []
-        
-        com_primeiro = self._combinacoes(array[1:], r-1)
-
-        com_primeiro = [[array[0]] + comb for comb in com_primeiro]
-        
-        sem_primeiro = self._combinacoes(array[1:], r)
-        return com_primeiro + sem_primeiro """
+        # with open("KB", "a") as kb:
+            # kb.write(conhecimento + "\n")
+        self.KB.append(conhecimento)
 
     def gerar_clausulas(self, array: list, r: int):
         L = combinations(array, len(array) - r + 1)
-        n_array = [-x for x in array]
+        n_array = [f"-{x}" for x in array]
         U = combinations(n_array, r + 1)
         c = list(L) + list(U)
-        clausulas = [" ".join(str(num) for num in tupla) + " 0" for tupla in c]
-        return clausulas, len(clausulas)
-        # return c, len(c)
+        # clausulas = [" ".join(str(num) for num in tupla) + " 0" for tupla in c]
+        return c, len(c)
 
-    def escrever_clausulas(self, array):
-        with open("KB", "a") as f:
-            lines = (" ".join(map(str, row)) + " 0\n" for row in array)
-            f.writelines(lines)
+    # def escrever_clausulas(self, array):
+    #     with open("KB", "a") as f:
+    #         lines = (" ".join(map(str, row)) + " 0\n" for row in array)
+    #         f.writelines(lines)
 
     def ler(self):
         num_posicoes = int(input())
@@ -142,21 +104,36 @@ class CampoMinado:
                 clausulas, tam_clausulas = self.gerar_clausulas(adjs, valor)
                 self.clausulas += tam_clausulas
                 # self.escrever_clausulas(clausulas)
-                with open("KB", "a") as kb:
-                    for clausula in clausulas:
-                        kb.write(clausula + "\n")
+                # with open("KB", "a") as kb:
+                #     for clausula in clausulas:
+                #         kb.write(" ".join(clausula) + " 0 \n")
+                
+                # self.KB.extend(clausulas)
+                for clausula in clausulas:
+                    self.KB.append(" ".join(clausula) + " 0")
+                    # self.KB.append(clausula)
+                # print(self.KB)
 
     def verifica_sat(self, var: int, neg: bool = False) -> int:
         if neg:
             var *= -1
-        with open("pergunta.cnf", "w") as p:
-            with open("KB", "r") as kb:
-                p.write(f"p cnf {self.mapa.totvars} {self.clausulas+1}\n")
-                p.write(kb.read())
-                p.write(f"{var} 0\n")
+
+        # 1) monte o header
+        header = f"p cnf {self.mapa.totvars} {self.clausulas + 1}\n"
+        # 2) junte KB + consulta
+        body   = "\n".join(self.KB)
+        query  = f"{var} 0\n"
+        cnf    = header + body + "\n" + query
+
+        # with open("pergunta.cnf", "w") as p:
+        #     with open("KB", "r") as kb:
+        #         p.write(f"p cnf {self.mapa.totvars} {self.clausulas+1}\n")
+        #         p.write(kb.read())
+        #         p.write(f"{var} 0\n")
 
         ret = subprocess.run(
-            ["clasp", "pergunta.cnf"],
+            ["clasp", "-"],
+            input=cnf.encode(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         ).returncode
@@ -173,17 +150,18 @@ class CampoMinado:
 
             pos_adj = self.mapa.fila.popleft()
 
-            """ if self.qtde_bombas <= 3:
-                nao_abertos  if self.qtde_bombas <= 3:= []
-                for linha in range(self.mapa.linhas):
-                    for coluna in range(self.mapa.colunas):
-                        var = self.mapa.get_var(linha, coluna)
-                        if self.mapa.mapa[var][2] is None:
-                            nao_abertos.append(var)
-                if len(nao_abertos) <= 10:
-                    clausulas, tam = self.gerar_clausulas(nao_abertos, self.qtde_bombas)
-                    self.clausulas += tam
-                    self.escrever_clausulas(clausulas) """
+            # nao_abertos = []
+
+            # if self.qtde_bombas <= 3:
+            #     for linha in range(self.mapa.linhas):
+            #         for coluna in range(self.mapa.colunas):
+            #             var = self.mapa.get_var(linha, coluna)
+            #             if self.mapa.mapa[var][2] is None:
+            #                 nao_abertos.append(var)
+            #     if len(nao_abertos) <= 10:
+            #         clausulas, tam = self.gerar_clausulas(nao_abertos, self.qtde_bombas)
+            #         self.clausulas += tam
+            #         self.escrever_clausulas(clausulas)
 
             tem_bomba = self.verifica_sat(pos_adj, neg=True)
             if tem_bomba == 20:
@@ -199,13 +177,15 @@ class CampoMinado:
             else:
                 nova_fila.append(pos_adj)
 
-        with open("KB", "a") as kb:
-            for seguro in var_seguros:
-                kb.write(f"{-seguro} 0\n")
-                self.clausulas += 1
-            for bomba in var_bombas:
-                kb.write(f"{bomba} 0\n")
-                self.clausulas += 1
+        # with open("KB", "a") as kb:
+        for seguro in var_seguros:
+            # kb.write(f"{-seguro} 0\n")
+            self.escrever(f"{-seguro} 0")
+            self.clausulas += 1
+        for bomba in var_bombas:
+            self.escrever(f"{bomba} 0")
+            # kb.write(f"{bomba} 0\n")
+            self.clausulas += 1
 
         self.mapa.fila = nova_fila
 
@@ -240,10 +220,7 @@ if __name__ == "__main__":
     tempo_esgotado = False
 
     signal.signal(signal.SIGALRM, handler)
-    signal.setitimer(signal.ITIMER_REAL, 9.5)
-
-    with open("KB", "w") as kb:
-        pass
+    signal.setitimer(signal.ITIMER_REAL, 8.0)
 
     tamanho = int(input())
     bombas = int(input())
