@@ -149,6 +149,15 @@ class CampoMinado:
     def verifica_sat(self, var: int, neg: bool = False) -> int:
         if neg:
             var *= -1
+
+        """ now = time.time()
+        remaining = now - start_time
+
+        if (remaining > 9.3):
+            print(0)
+            sys.exit(0) """
+
+
         with open("pergunta.cnf", "w") as p:
             with open("KB", "r") as kb:
                 p.write(f"p cnf {self.mapa.totvars} {self.clausulas+1}\n")
@@ -159,6 +168,7 @@ class CampoMinado:
             ["clasp", "pergunta.cnf"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            #timeout=remaining,
         ).returncode
 
         return ret
@@ -210,10 +220,9 @@ class CampoMinado:
         self.mapa.fila = nova_fila
 
     def resposta(self) -> bool:
-        if tempo_esgotado:
+        """ if tempo_esgotado:
             print(0)
-            sys.exit(0)
-            return False
+            sys.exit(0) """
 
         tot_len = len(self.bombas) + len(self.seguros)
         print(tot_len)
@@ -232,12 +241,13 @@ class CampoMinado:
 
 
 def handler(signum, frame):
-    global tempo_esgotado
-    tempo_esgotado = True
+    print(0)
+    sys.exit(0)
 
 if __name__ == "__main__":
 
-    tempo_esgotado = False
+    #tempo_esgotado = False
+    #start_time = time.time()
 
     signal.signal(signal.SIGALRM, handler)
     signal.setitimer(signal.ITIMER_REAL, 9.5)
