@@ -1,9 +1,7 @@
-import os
 import subprocess
 from collections import deque
 import signal, sys
 from itertools import combinations
-
 
 class Mapa:
     def __init__(self, tamanho):
@@ -15,49 +13,35 @@ class Mapa:
         for linha in range(self.linhas):
             for coluna in range(self.colunas):
                 self.totvars += 1
-                self.mapa[self.totvars] = [linha, coluna, None, False]
+                self.mapa[self.totvars] = {
+                    "linha": linha, 
+                    "coluna": coluna, 
+                    "valor": None, 
+                    "visitado": False, 
+                    "posicao": "U"
+                    }
                 self.mapa[linha, coluna] = self.totvars
+        self.vizinhos = {}
+        for key, val in self.mapa.items():
+            if not isinstance(key, int):
+                continue
+            self.vizinhos[key] = self.adj(val["linha"], val["coluna"])
 
-    def get_posicao(self, var):
+    def get_posicao(self, var) -> dict:
         return self.mapa[var]
 
-    def get_var(self, linha, coluna):
+    def get_var(self, linha, coluna) -> int:
         return self.mapa[linha, coluna]
 
     def adj(self, linha, coluna):
-        direcoes = [
-            [-1, -1],
-            [0, -1],
-            [1, -1],
-            [1, 0],
-            [1, 1],
-            [0, 1],
-            [-1, 1],
-            [-1, 0],
-        ]
-
         adjs = []
 
-        for direcao in direcoes:
-            nlinha = linha + direcao[0]
-            ncoluna = coluna + direcao[1]
-            if (
-                nlinha < self.linhas
-                and nlinha >= 0
-                and ncoluna < self.colunas
-                and ncoluna >= 0
-            ):
-                var = self.get_var(nlinha, ncoluna)
-                adjs.append(f'{var}')
-                if not self.mapa[var][-1]:
-                    self.mapa[var][-1] = True
-                    self.fila.append(var)
-
-        for elem in list(self.fila):
-            if self.mapa[elem][2] is not None:
-                self.fila.remove(elem)
+        for dl, dc in [(-1,-1),(0,-1),(1,-1),(1,0),(1,1),(0,1),(-1,1),(-1,0)]:
+            nl, nc = linha+dl, coluna+dc
+            if 0 <= nl < self.linhas and 0 <= nc < self.colunas:
+              var = self.get_var(nl, nc)
+              adjs.append(str(var))
         return adjs
-
 
 class CampoMinado:
     def __init__(self, mapa: Mapa, qtde_bombas: int):
@@ -69,8 +53,6 @@ class CampoMinado:
         self.KB: list[str] = []
 
     def escrever(self, conhecimento: str):
-        # with open("KB", "a") as kb:
-            # kb.write(conhecimento + "\n")
         self.KB.append(conhecimento)
 
     def gerar_clausulas(self, array: list, r: int):
@@ -78,13 +60,46 @@ class CampoMinado:
         n_array = [f"-{x}" for x in array]
         U = combinations(n_array, r + 1)
         c = list(L) + list(U)
-        # clausulas = [" ".join(str(num) for num in tupla) + " 0" for tupla in c]
         return c, len(c)
 
-    # def escrever_clausulas(self, array):
-    #     with open("KB", "a") as f:
-    #         lines = (" ".join(map(str, row)) + " 0\n" for row in array)
-    #         f.writelines(lines)
+    def analise_local(self, adjs, valor):
+        b = []
+        a = []
+        u = []
+        for adj in adjs:
+            adj = int(adj)
+            posicao = self.mapa.mapa[adj]["posicao"]
+            match posicao:
+                case "B":
+                    b.append(adj)
+                case "A":
+                    a.append(adj)
+                case "U":
+                    u.append(adj)
+                case _:
+                    continue
+        clausulas_geradas = False
+        tb = len(b)
+        tu = len(u)
+        for p in u:
+            m = self.mapa.mapa[p]
+            if tb == valor:
+                m["posicao"] = "A"
+                self.seguros.append([m["linha"], m["coluna"]])
+                self.escrever(f"{-p} 0")
+                clausulas_geradas = True
+            elif tu + tb == valor:
+                m["posicao"] = "B"
+                self.bombas.append([m["linha"], m["coluna"]])
+                self.escrever(f"{p} 0")
+                clausulas_geradas = True
+                self.qtde_bombas -= 1
+            else:
+                if not m["visitado"]:
+                    m["visitado"] = True
+                    self.mapa.fila.append(p)
+        return clausulas_geradas
+
 
     def ler(self):
         num_posicoes = int(input())
@@ -94,49 +109,48 @@ class CampoMinado:
 
             var = self.mapa.get_var(linha, coluna)
 
-            self.mapa.mapa[var] = [linha, coluna, valor, True]
+            # verificar se já está em seguros e remover caso sim
+            try:
+                self.seguros.remove([linha, coluna])
+            except Exception as e:
+                pass
+
+            self.mapa.mapa[var].update({"valor": valor, "visitado": True, "posicao": "A"})
 
             self.escrever(f"{-var} 0")
             self.clausulas += 1
 
             if valor != 0:
-                adjs = mapa.adj(linha, coluna)
-                clausulas, tam_clausulas = self.gerar_clausulas(adjs, valor)
-                self.clausulas += tam_clausulas
-                # self.escrever_clausulas(clausulas)
-                # with open("KB", "a") as kb:
-                #     for clausula in clausulas:
-                #         kb.write(" ".join(clausula) + " 0 \n")
-                
-                # self.KB.extend(clausulas)
-                for clausula in clausulas:
-                    self.KB.append(" ".join(clausula) + " 0")
-                    # self.KB.append(clausula)
-                # print(self.KB)
+                adjs = self.mapa.vizinhos[var]
+
+                clausulas_geradas = self.analise_local(adjs, valor)
+
+                for elem in list(self.mapa.fila):
+                    if self.mapa.mapa[elem]["posicao"] != "U":
+                        self.mapa.fila.remove(elem)
+
+                if not clausulas_geradas:
+
+                    clausulas, tam_clausulas = self.gerar_clausulas(adjs, valor)
+                    self.clausulas += tam_clausulas
+
+                    for clausula in clausulas:
+                        self.KB.append(" ".join(clausula) + " 0")
 
     def verifica_sat(self, var: int, neg: bool = False) -> int:
         if neg:
             var *= -1
 
-        # 1) monte o header
         header = f"p cnf {self.mapa.totvars} {self.clausulas + 1}\n"
-        # 2) junte KB + consulta
         body   = "\n".join(self.KB)
         query  = f"{var} 0\n"
         cnf    = header + body + "\n" + query
-
-        # with open("pergunta.cnf", "w") as p:
-        #     with open("KB", "r") as kb:
-        #         p.write(f"p cnf {self.mapa.totvars} {self.clausulas+1}\n")
-        #         p.write(kb.read())
-        #         p.write(f"{var} 0\n")
 
         ret = subprocess.run(
             ["clasp", "-"],
             input=cnf.encode(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            #timeout=remaining,
         ).returncode
 
         return ret
@@ -150,52 +164,38 @@ class CampoMinado:
         while self.mapa.fila:
 
             pos_adj = self.mapa.fila.popleft()
-
-            # nao_abertos = []
-
-            # if self.qtde_bombas <= 3:
-            #     for linha in range(self.mapa.linhas):
-            #         for coluna in range(self.mapa.colunas):
-            #             var = self.mapa.get_var(linha, coluna)
-            #             if self.mapa.mapa[var][2] is None:
-            #                 nao_abertos.append(var)
-            #     if len(nao_abertos) <= 10:
-            #         clausulas, tam = self.gerar_clausulas(nao_abertos, self.qtde_bombas)
-            #         self.clausulas += tam
-            #         self.escrever_clausulas(clausulas)
+            pos = self.mapa.get_posicao(pos_adj)
 
             tem_bomba = self.verifica_sat(pos_adj, neg=True)
             if tem_bomba == 20:
                 var_bombas.append(pos_adj)
-                self.bombas.append(self.mapa.get_posicao(pos_adj)[:2])
+                self.bombas.append([pos["linha"], pos["coluna"]])
                 self.qtde_bombas -= 1
                 continue
 
             e_seguro = self.verifica_sat(pos_adj)
             if e_seguro == 20:
                 var_seguros.append(pos_adj)
-                self.seguros.append(self.mapa.get_posicao(pos_adj)[:2])
+                self.seguros.append([pos["linha"], pos["coluna"]])
             else:
                 nova_fila.append(pos_adj)
 
-        # with open("KB", "a") as kb:
         for seguro in var_seguros:
-            # kb.write(f"{-seguro} 0\n")
             self.escrever(f"{-seguro} 0")
+            self.mapa.mapa[seguro].update({"posicao": "A"})
             self.clausulas += 1
         for bomba in var_bombas:
             self.escrever(f"{bomba} 0")
-            # kb.write(f"{bomba} 0\n")
+            self.mapa.mapa[bomba].update({"posicao": "B"})
             self.clausulas += 1
 
         self.mapa.fila = nova_fila
 
     def resposta(self) -> bool:
-        """ if tempo_esgotado:
-            print(0)
-            sys.exit(0) """
 
         tot_len = len(self.bombas) + len(self.seguros)
+        if self.qtde_bombas == 0:
+            print(0)
         print(tot_len)
 
         for s in self.seguros:
@@ -217,14 +217,8 @@ def handler(signum, frame):
 
 if __name__ == "__main__":
 
-    #tempo_esgotado = False
-    #start_time = time.time()
-
     signal.signal(signal.SIGALRM, handler)
-    signal.setitimer(signal.ITIMER_REAL, 9.5)
-
-    with open("KB", "w") as kb:
-        pass
+    signal.setitimer(signal.ITIMER_REAL, 10.0)
 
     tamanho = int(input())
     bombas = int(input())
