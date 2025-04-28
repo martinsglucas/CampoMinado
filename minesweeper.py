@@ -113,7 +113,6 @@ class CampoMinado:
 
             var = self.mapa.get_var(linha, coluna)
 
-            # verificar se já está em seguros e remover caso sim
             try:
                 self.seguros.remove([linha, coluna])
             except ValueError:
@@ -140,8 +139,6 @@ class CampoMinado:
                     clausulas = self.gerar_clausulas(adjs, valor)
                     self.clausulas += len(clausulas)
                     self.KB.extend(clausulas)
-                    # for clausula in clausulas:
-                        # self.KB.append(" ".join(clausula) + " 0")
 
     def formatar_cnf(self, query: int) -> bytes:
         
@@ -226,6 +223,7 @@ class CampoMinado:
         for b in self.bombas:
             l, c = b
             print(f"{l} {c} B")
+        
         # if descobrir == self.qtde_bombas:
         #     for var in range(1,self.mapa.totvars+1):
         #         p = self.mapa.mapa[var]
@@ -247,7 +245,7 @@ def handler(signum, frame):
 if __name__ == "__main__":
 
     signal.signal(signal.SIGALRM, handler)
-    signal.setitimer(signal.ITIMER_REAL, 9.5)
+    signal.setitimer(signal.ITIMER_REAL, 9.9)
 
     tamanho = int(input())
     bombas = int(input())
